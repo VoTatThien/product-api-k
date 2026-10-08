@@ -18,7 +18,7 @@ app.use(express.urlencoded({ extended: true }));
 // Root welcome endpoint
 app.get("/", (req, res) => {
   res.status(200).json({
-    message: "Welcome to Product CRUD RESTful API",
+    message: "Welcome to Product CRUD RESTful API asdf",
     endpoints: {
       health: "GET /health",
       getAllProducts: "GET /api/products",
