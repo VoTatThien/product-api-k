@@ -11,12 +11,11 @@ Dự án xây dựng ứng dụng RESTful API hoàn chỉnh quản lý **Product
 4. [Bước 7: Dockerize cho Product API (Dockerfile)](#4-bước-7-dockerize-cho-product-api-dockerfile)
 5. [Bước 8: Sử dụng Docker Compose](#5-bước-8-sử-dụng-docker-compose)
 6. [Bước 9: Healthcheck cho MongoDB + Product API](#6-bước-9-healthcheck-cho-mongodb--product-api)
-7. [Bước 10: CI Pipeline đơn giản (test-productci.yml)](#7-bước-10-ci-pipeline-đơn-giản-test-productciyml)
-8. [Bước 11: CI Pipeline thực tế với MongoDB (test-productci-prod.yml)](#8-bước-11-ci-pipeline-thực-tế-với-mongodb-test-productci-prodyml)
-9. [Bước 12: CD với Docker Hub & Healthcheck](#9-bước-12-cd-với-docker-hub--healthcheck)
-10. [Bước 13: Chạy image từ Docker Hub trên Local (docker-compose-prod.yaml)](#10-bước-13-chạy-image-từ-docker-hub-trên-local-docker-compose-prodyaml)
-11. [Bước 14: Tự động hóa quá trình CD (GitHub Actions → Docker Hub → Local)](#11-bước-14-tự-động-hóa-quá-trình-cd-github-actions--docker-hub--local)
-12. [Hướng dẫn kiểm thử API (Postman / cURL / PowerShell)](#12-hướng-dẫn-kiểm-thử-api)
+7. [Bước 10 & 11: CI Pipeline (test-productci-prod.yml)](#7-bước-10--11-ci-pipeline-test-productci-prodyml)
+8. [Bước 12: CD với Docker Hub & Healthcheck](#8-bước-12-cd-với-docker-hub--healthcheck)
+9. [Bước 13: Chạy image từ Docker Hub trên Local (docker-compose-prod.yaml)](#9-bước-13-chạy-image-từ-docker-hub-trên-local-docker-compose-prodyaml)
+10. [Bước 14: Tự động hóa quá trình CD (GitHub Actions → Docker Hub → Local)](#10-bước-14-tự-động-hóa-quá-trình-cd-github-actions--docker-hub--local)
+11. [Hướng dẫn kiểm thử API (Postman / cURL / PowerShell)](#11-hướng-dẫn-kiểm-thử-api)
 
 ---
 
@@ -26,8 +25,7 @@ Dự án xây dựng ứng dụng RESTful API hoàn chỉnh quản lý **Product
 product-api-k/
 ├── .github/
 │   └── workflows/
-│       ├── test-productci.yml       # Bước 10: CI Pipeline thử nghiệm đơn giản
-│       └── test-productci-prod.yml  # Bước 11 & 12: CI CRUD thật với MongoDB + CD Docker Hub + Deploy
+│       └── test-productci-prod.yml  # CI/CD: CRUD test, build, push và deploy
 ├── config/
 │   └── db.js                        # Kết nối MongoDB qua Mongoose
 ├── controllers/
@@ -208,30 +206,19 @@ Ví dụ phản hồi JSON:
 
 ---
 
-## 7. Bước 10: CI Pipeline đơn giản (`test-productci.yml`)
-
-Đường dẫn: `.github/workflows/test-productci.yml`
-
-Quy trình kiểm thử đơn giản phục vụ sanity check nhanh cho mỗi push / pull request:
-- Checkout mã nguồn.
-- Cài đặt môi trường Node.js 20 có cache npm.
-- Cài đặt dependencies (`npm ci`).
-- Chạy unit test nhanh độc lập (`npm run test:unit`) không cần cơ sở dữ liệu.
-
----
-
-## 8. Bước 11: CI Pipeline thực tế với MongoDB (`test-productci-prod.yml`)
+## 7. Bước 10 & 11: CI Pipeline (`test-productci-prod.yml`)
 
 Đường dẫn: `.github/workflows/test-productci-prod.yml`
 
-Đây là workflow CI thực tế chuẩn doanh nghiệp:
+Đây là workflow CI/CD duy nhất của dự án:
 1. **GitHub Actions Service Container**: Khởi tạo container `mongo:7` trực tiếp trên máy ảo Ubuntu với healthcheck.
-2. **Integration CRUD Tests**: Thực thi bộ kiểm thử Jest + Supertest (`npm test`) trên MongoDB thật với 14 kịch bản kiểm thử (tạo trùng pid, thiếu trường, số lượng âm, cập nhật, xóa, healthcheck).
-3. **Docker Build & Containerized Healthcheck**: Build Docker image và khởi chạy container trong mạng bridge cô lập trên máy ảo GitHub để kiểm tra tính năng `HEALTHCHECK` thực tế của container trước khi sang bước CD.
+2. **Integration CRUD Tests**: Thực thi Jest + Supertest (`npm test`) trên MongoDB thật với 14 kịch bản kiểm thử.
+3. **Docker Healthcheck**: Build image và kiểm tra endpoint `/health` trong stack container cô lập.
+4. **CD**: Sau khi CI thành công trên nhánh `main`, build và push image lên Docker Hub, sau đó triển khai qua self-hosted runner.
 
 ---
 
-## 9. Bước 12: CD với Docker Hub & Healthcheck
+## 8. Bước 12: CD với Docker Hub & Healthcheck
 
 Tích hợp trong job `cd-dockerhub` của `test-productci-prod.yml`:
 - Chỉ kích hoạt khi:
@@ -252,7 +239,7 @@ Tích hợp trong job `cd-dockerhub` của `test-productci-prod.yml`:
 
 ---
 
-## 10. Bước 13: Chạy image từ Docker Hub trên Local (`docker-compose-prod.yaml`)
+## 9. Bước 13: Chạy image từ Docker Hub trên Local (`docker-compose-prod.yaml`)
 
 File `docker-compose-prod.yaml` sử dụng image đã được đẩy lên Docker Hub:
 
@@ -293,7 +280,7 @@ docker compose -f docker-compose-prod.yaml up -d
 
 ---
 
-## 11. Bước 14: Tự động hóa quá trình CD (GitHub Actions → Docker Hub → Local)
+## 10. Bước 14: Tự động hóa quá trình CD (GitHub Actions → Docker Hub → Local)
 
 Để hoàn tất chu trình khép kín: **Code Push → GitHub Actions CI/CD → Docker Hub → Tự động cập nhật Local Docker Engine**, dự án cung cấp 2 giải pháp hoàn chỉnh:
 
@@ -332,7 +319,7 @@ Người dùng cũng có thể kích hoạt script triển khai nhanh:
 
 ---
 
-## 12. Hướng dẫn kiểm thử API
+## 11. Hướng dẫn kiểm thử API
 
 ### 1. Kiểm tra trạng thái Healthcheck:
 ```powershell
