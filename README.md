@@ -14,7 +14,7 @@ Dự án xây dựng ứng dụng RESTful API hoàn chỉnh quản lý **Product
 7. [Bước 10 & 11: CI Pipeline (test-productci-prod.yml)](#7-bước-10--11-ci-pipeline-test-productci-prodyml)
 8. [Bước 12: CD với Docker Hub & Healthcheck](#8-bước-12-cd-với-docker-hub--healthcheck)
 9. [Bước 13: Chạy image từ Docker Hub trên Local (docker-compose-prod.yaml)](#9-bước-13-chạy-image-từ-docker-hub-trên-local-docker-compose-prodyaml)
-10. [Bước 14: Tự động hóa quá trình CD (GitHub Actions → Docker Hub → Local)](#10-bước-14-tự-động-hóa-quá-trình-cd-github-actions--docker-hub--local)
+10. [Bước 14: Triển khai thủ công về Local](#10-bước-14-triển-khai-thủ-công-về-local)
 11. [Hướng dẫn kiểm thử API (Postman / cURL / PowerShell)](#11-hướng-dẫn-kiểm-thử-api)
 
 ---
@@ -25,7 +25,7 @@ Dự án xây dựng ứng dụng RESTful API hoàn chỉnh quản lý **Product
 product-api-k/
 ├── .github/
 │   └── workflows/
-│       └── test-productci-prod.yml  # CI/CD: CRUD test, build, push và deploy
+│       └── test-productci-prod.yml  # CI/CD: CRUD test, build và push Docker Hub
 ├── config/
 │   └── db.js                        # Kết nối MongoDB qua Mongoose
 ├── controllers/
@@ -214,7 +214,7 @@ Ví dụ phản hồi JSON:
 1. **GitHub Actions Service Container**: Khởi tạo container `mongo:7` trực tiếp trên máy ảo Ubuntu với healthcheck.
 2. **Integration CRUD Tests**: Thực thi Jest + Supertest (`npm test`) trên MongoDB thật với 14 kịch bản kiểm thử.
 3. **Docker Healthcheck**: Build image và kiểm tra endpoint `/health` trong stack container cô lập.
-4. **CD**: Sau khi CI thành công trên nhánh `main`, build và push image lên Docker Hub, sau đó triển khai qua self-hosted runner.
+4. **CD**: Sau khi CI thành công trên nhánh `main`, build và push image lên Docker Hub. Việc triển khai về máy local được thực hiện thủ công.
 
 ---
 
@@ -280,11 +280,22 @@ docker compose -f docker-compose-prod.yaml up -d
 
 ---
 
-## 10. Bước 14: Tự động hóa quá trình CD (GitHub Actions → Docker Hub → Local)
+## 10. Bước 14: Triển khai thủ công về Local
 
-Để hoàn tất chu trình khép kín: **Code Push → GitHub Actions CI/CD → Docker Hub → Tự động cập nhật Local Docker Engine**, dự án cung cấp 2 giải pháp hoàn chỉnh:
+GitHub Actions kết thúc sau khi build và push image lên Docker Hub. Khi muốn triển khai phiên bản mới về máy local, chạy:
 
-### ⭐ Giải pháp 1 (Khuyên dùng - Zero Configuration): Dùng Watchtower
+```powershell
+docker compose -f docker-compose-prod.yaml pull
+docker compose -f docker-compose-prod.yaml up -d --remove-orphans
+```
+
+Hoặc dùng script có sẵn:
+
+- **Windows**: `\.\deploy-local.ps1`
+- **Linux / macOS**: `./deploy-local.sh`
+
+### Tùy chọn: Tự động cập nhật bằng Watchtower
+
 Trong `docker-compose-prod.yaml` đã tích hợp sẵn dịch vụ **Watchtower**:
 ```yaml
   watchtower:
@@ -299,23 +310,7 @@ Trong `docker-compose-prod.yaml` đã tích hợp sẵn dịch vụ **Watchtower
       WATCHTOWER_CLEANUP: "true"
       WATCHTOWER_INCLUDE_RESTARTING: "true"
 ```
-- **Cơ chế hoạt động**: Watchtower chạy ngầm trên Local Docker Engine, định kỳ mỗi 30 giây kiểm tra xem image trên Docker Hub có phiên bản mới hơn không. Khi GitHub Actions build & push xong, Watchtower sẽ **tự động tải image mới về, dừng container cũ một cách an toàn và khởi động container mới**! Không cần mở port mạng và không cần cấu hình phức tạp.
-
-### 🚀 Giải pháp 2: GitHub Actions Self-Hosted Runner
-Được tích hợp sẵn trong job `deploy-local-runner` của `test-productci-prod.yml`.
-1. Cài đặt GitHub Actions Runner trên máy local:
-   - Vào GitHub Repo → **Settings** → **Actions** → **Runners** → **New self-hosted runner**.
-   - Làm theo hướng dẫn tải về và chạy `./run.cmd`.
-2. Khi GitHub Actions chạy xong CD trên Docker Hub, nó sẽ tự động điều phối runner trên máy local chạy lệnh:
-   ```powershell
-   docker compose -f docker-compose-prod.yaml pull
-   docker compose -f docker-compose-prod.yaml up -d --remove-orphans
-   ```
-
-### ⚡ Script chạy nhanh 1-Click:
-Người dùng cũng có thể kích hoạt script triển khai nhanh:
-- **Windows**: Chạy file `.\deploy-local.ps1`
-- **Linux / macOS**: Chạy `./deploy-local.sh`
+- **Cơ chế hoạt động**: Watchtower chạy ngầm trên Local Docker Engine, định kỳ mỗi 30 giây kiểm tra Docker Hub và tự cập nhật container. Nếu muốn hoàn toàn triển khai thủ công, không khởi chạy service `watchtower`.
 
 ---
 

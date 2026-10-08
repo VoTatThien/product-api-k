@@ -155,30 +155,3 @@ jobs:
           echo "📦 Image: ${{ env.DOCKER_IMAGE_NAME }}:latest"
           echo "🔖 Commit SHA Tag: ${{ env.DOCKER_IMAGE_NAME }}:${{ github.sha }}"
           echo "=========================================================="
-
-  # ==========================================================
-  # 3. CD AUTOMATION: Deploy to Local Docker Engine
-  # ==========================================================
-  deploy-local-runner:
-    name: CD - Deploy to Local Docker Engine (Self-Hosted Runner)
-    needs: cd-dockerhub
-    runs-on: self-hosted
-    if: github.ref == 'refs/heads/main'
-    continue-on-error: true
-
-    steps:
-      - name: Checkout code on Local Machine
-        uses: actions/checkout@v4
-
-      - name: Pull latest image from Docker Hub
-        run: docker compose -f docker-compose-prod.yaml pull
-
-      - name: Restart production stack with latest image
-        run: docker compose -f docker-compose-prod.yaml up -d --remove-orphans
-
-      - name: Verify Local Deployment Healthcheck
-        run: |
-          Write-Host "Verifying local deployment health..."
-          Start-Sleep -Seconds 5
-          $response = Invoke-RestMethod -Uri "http://localhost:3000/health"
-          Write-Host "Health Status: $($response.status)"
